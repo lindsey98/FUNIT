@@ -35,7 +35,7 @@ class ImageLabelFilelist(data.Dataset):
         self.transform = transform
         self.loader = loader
         self.classes = sorted(
-            list(set([path.split('/')[0] for path in self.im_list])))
+            list(set([path.split('/')[0] for path in self.im_list]))) # get the class labels for each files
         self.class_to_idx = {self.classes[i]: i for i in
                              range(len(self.classes))}
         self.imgs = [(im_path, self.class_to_idx[im_path.split('/')[0]]) for

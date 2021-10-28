@@ -32,19 +32,21 @@ class Trainer(nn.Module):
         lr_dis = cfg['lr_dis']
         dis_params = list(self.model.dis.parameters())
         gen_params = list(self.model.gen.parameters())
+
         self.dis_opt = torch.optim.RMSprop(
             [p for p in dis_params if p.requires_grad],
             lr=lr_gen, weight_decay=cfg['weight_decay'])
         self.gen_opt = torch.optim.RMSprop(
             [p for p in gen_params if p.requires_grad],
             lr=lr_dis, weight_decay=cfg['weight_decay'])
+
         self.dis_scheduler = get_scheduler(self.dis_opt, cfg)
         self.gen_scheduler = get_scheduler(self.gen_opt, cfg)
-        self.apply(weights_init(cfg['init']))
-        self.model.gen_test = copy.deepcopy(self.model.gen)
+        self.apply(weights_init(cfg['init'])) # Kaiming initialization
+        self.model.gen_test = copy.deepcopy(self.model.gen) # copy of initial
 
     def gen_update(self, co_data, cl_data, hp, multigpus):
-        self.gen_opt.zero_grad()
+        self.gen_opt.zero_grad() # zero-out grad first
         al, ad, xr, cr, sr, ac = self.model(co_data, cl_data, hp, 'gen_update')
         self.loss_gen_total = torch.mean(al)
         self.loss_gen_recon_x = torch.mean(xr)
@@ -52,20 +54,21 @@ class Trainer(nn.Module):
         self.loss_gen_recon_s = torch.mean(sr)
         self.loss_gen_adv = torch.mean(ad)
         self.accuracy_gen_adv = torch.mean(ac)
-        self.gen_opt.step()
+        self.gen_opt.step() # backward pass is already performed in self.model.gen_update
+
         this_model = self.model.module if multigpus else self.model
         update_average(this_model.gen_test, this_model.gen)
         return self.accuracy_gen_adv.item()
 
     def dis_update(self, co_data, cl_data, hp):
-        self.dis_opt.zero_grad()
+        self.dis_opt.zero_grad() # zero-out grad first
         al, lfa, lre, reg, acc = self.model(co_data, cl_data, hp, 'dis_update')
         self.loss_dis_total = torch.mean(al)
         self.loss_dis_fake_adv = torch.mean(lfa)
         self.loss_dis_real_adv = torch.mean(lre)
         self.loss_dis_reg = torch.mean(reg)
         self.accuracy_dis_adv = torch.mean(acc)
-        self.dis_opt.step()
+        self.dis_opt.step() # backward pass is already performed in self.model.gen_update
         return self.accuracy_dis_adv.item()
 
     def test(self, co_data, cl_data, multigpus):

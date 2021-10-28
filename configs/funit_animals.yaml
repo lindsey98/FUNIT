@@ -9,7 +9,7 @@ snapshot_save_iter: 5000      # How often do you want to save trained models
 log_iter: 1                   # How often do you want to log the training stats
 
 # optimization options
-max_iter: 100000              # maximum number of training iterations
+max_iter: 100000              # TODO maximum number of training iterations
 weight_decay: 0.0001          # weight decay
 lr_gen: 0.0001                # learning rate for the generator
 lr_dis: 0.0001                # learning rate for the discriminator
@@ -30,15 +30,15 @@ gen:
 dis:
   nf: 64                      # base number of filters
   n_res_blks: 10              # number of residual blocks in the discriminator
-  num_classes: 119            # number of classes in the training set
+  num_classes: 50            # TODO number of classes in the training set
 
 # data options
 num_workers: 4
-batch_size: 64
-new_size: 140                 # first resize the shortest image side to this size
-crop_image_height: 128        # random crop image of this height
-crop_image_width: 128         # random crop image of this width
-data_folder_train: ./datasets/animals
-data_list_train: ./datasets/animals_list_train.txt
-data_folder_test: ./datasets/animals
-data_list_test: ./datasets/animals_list_test.txt
+batch_size: 32
+new_size: 227                 # first resize the shortest image side to this size
+crop_image_height: 227        # random crop image of this height
+crop_image_width: 227         # random crop image of this width
+data_folder_train: ./datasets/animals # TODO
+data_list_train: ./datasets/animals_list_train.txt # TODO
+data_folder_test: ./datasets/animals # TODO
+data_list_test: ./datasets/animals_list_test.txt # TODO

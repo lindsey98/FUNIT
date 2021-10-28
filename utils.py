@@ -37,6 +37,7 @@ def loader_from_list(
         center_crop=False,
         return_paths=False,
         drop_last=True):
+
     transform_list = [transforms.ToTensor(),
                       transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
     if center_crop:
@@ -104,45 +105,48 @@ def get_train_loaders(conf):
     new_size = conf['new_size']
     width = conf['crop_image_width']
     height = conf['crop_image_height']
-    train_content_loader = loader_from_list(
-            root=conf['data_folder_train'],
-            file_list=conf['data_list_train'],
-            batch_size=batch_size,
-            new_size=new_size,
-            height=height,
-            width=width,
-            crop=True,
-            num_workers=num_workers)
-    train_class_loader = loader_from_list(
-            root=conf['data_folder_train'],
-            file_list=conf['data_list_train'],
-            batch_size=batch_size,
-            new_size=new_size,
-            height=height,
-            width=width,
-            crop=True,
-            num_workers=num_workers)
-    test_content_loader = loader_from_list(
-            root=conf['data_folder_test'],
-            file_list=conf['data_list_test'],
-            batch_size=batch_size,
-            new_size=new_size,
-            height=height,
-            width=width,
-            crop=True,
-            num_workers=1)
-    test_class_loader = loader_from_list(
-            root=conf['data_folder_test'],
-            file_list=conf['data_list_test'],
-            batch_size=batch_size,
-            new_size=new_size,
-            height=height,
-            width=width,
-            crop=True,
-            num_workers=1)
 
-    return (train_content_loader, train_class_loader, test_content_loader,
-            test_class_loader)
+    train_content_loader = loader_from_list(
+                                root=conf['data_folder_train'],
+                                file_list=conf['data_list_train'],
+                                batch_size=batch_size,
+                                new_size=new_size,
+                                height=height,
+                                width=width,
+                                crop=True,
+                                num_workers=num_workers)
+
+    train_class_loader = loader_from_list(
+                                root=conf['data_folder_train'],
+                                file_list=conf['data_list_train'],
+                                batch_size=batch_size,
+                                new_size=new_size,
+                                height=height,
+                                width=width,
+                                crop=True,
+                                num_workers=num_workers)
+
+    test_content_loader = loader_from_list(
+                            root=conf['data_folder_test'],
+                            file_list=conf['data_list_test'],
+                            batch_size=batch_size,
+                            new_size=new_size,
+                            height=height,
+                            width=width,
+                            crop=True,
+                            num_workers=1)
+
+    test_class_loader = loader_from_list(
+                            root=conf['data_folder_test'],
+                            file_list=conf['data_list_test'],
+                            batch_size=batch_size,
+                            new_size=new_size,
+                            height=height,
+                            width=width,
+                            crop=True,
+                            num_workers=1)
+
+    return (train_content_loader, train_class_loader, test_content_loader, test_class_loader)
 
 
 def get_config(config):
