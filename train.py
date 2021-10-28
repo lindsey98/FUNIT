@@ -37,6 +37,7 @@ if __name__ == '__main__':
     # Load experiment setting
     config = get_config(opts.config)
     max_iter = config['max_iter']
+
     # Override the batch size if specified.
     if opts.batch_size != 0:
         config['batch_size'] = opts.batch_size
@@ -109,6 +110,7 @@ if __name__ == '__main__':
                         write_1images(test_image_outputs, image_directory,
                                       'test_%s_%02d' % (key_str, t))
             '''
+
             if (iterations + 1) % config['snapshot_save_iter'] == 0:
                 trainer.save(checkpoint_directory, iterations, opts.multigpus)
                 print('Saved model at iteration %d' % (iterations + 1))
