@@ -85,6 +85,14 @@ def prepare_data_list(root, data_name):
 
 
 if __name__ == '__main__':
-    prepare_data_list(root='/home/ruofan/PycharmProjects/SoftTriple/datasets/logo2k',
-                      data_name='logo2k')
+    # prepare_data_list(root='/home/ruofan/PycharmProjects/SoftTriple/datasets/logo2k',
+    #                   data_name='logo2k')
 
+    root = '/home/ruofan/PycharmProjects/SoftTriple/datasets/logo2k'
+    train_root = os.path.join(root, 'train_sub')
+    ct = 0
+    for folder in os.listdir(os.path.join(train_root)):
+        for file in os.listdir(os.path.join(train_root, folder)):
+            ct += 1
+
+    print(ct)
