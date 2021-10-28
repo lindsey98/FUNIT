@@ -17,6 +17,8 @@ from trainer import Trainer
 import torch.backends.cudnn as cudnn
 # Enable auto-tuner to find the best algorithm to use for your hardware.
 cudnn.benchmark = True
+os.environ["CUDA_VISIBLE_DEVICES"]="1, 0"
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--config', type=str,
@@ -28,7 +30,7 @@ parser.add_argument('--output_path', type=str,
 parser.add_argument('--multigpus', default=True, action="store_true")
 parser.add_argument("--resume", default=False, action="store_true")
 
-parser.add_argument('--batch_size', type=int, default=8)
+parser.add_argument('--batch_size', type=int, default=4)
 parser.add_argument('--test_batch_size', type=int, default=4)
 opts = parser.parse_args()
 
