@@ -67,12 +67,12 @@ python tools/extract_animalfaces.py datasets/ILSVRC/Data/CLS-LOC/train --output_
 Once the animal face dataset is prepared, you can train an animal face translation model by running.
 
 ```bash
-python train.py --config configs/funit_animals.yaml --multigpus
+python train.py --config configs/funit_cub.yaml --multigpus
 ```
 
 The training results including the checkpoints and intermediate results will be stored in `outputs/funit_animals`.
 
-For custom dataset, you would need to write an new configuration file. Please create one based on the [example config file](configs/funit_animals.yaml).
+For custom dataset, you would need to write an new configuration file. Please create one based on the [example config file](configs/funit_cub.yaml).
 
 ## Testing pretrained model
 
@@ -80,7 +80,7 @@ To test the pretrained model, please first create a folder `pretrained` under th
 
 Now, we can test the translation
 ```bash
-python test_k_shot.py --config configs/funit_animals.yaml --ckpt pretrained/animal149_gen.pt --input images/input_content.jpg --class_image_folder images/n02138411 --output images/output.jpg
+python test_k_shot.py --config configs/funit_cub.yaml --ckpt pretrained/animal149_gen.pt --input images/input_content.jpg --class_image_folder images/n02138411 --output images/output.jpg
 ```
 
 The above command with translate the input image

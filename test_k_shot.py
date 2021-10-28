@@ -20,7 +20,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--config',
                     type=str,
-                    default='configs/funit_animals.yaml')
+                    default='configs/funit_cub.yaml')
 parser.add_argument('--ckpt',
                     type=str,
                     default='pretrained/animal119_gen_00200000.pt')

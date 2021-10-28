@@ -232,7 +232,8 @@ class ClassModelEncoder(nn.Module):
                                        activation=activ,
                                        pad_type=pad_type)]
         self.model += [nn.AdaptiveAvgPool2d(1)] # W and H become 1
-        self.model += [nn.Conv2d(dim, latent_dim, 1, 1, 0)]
+        self.model += [nn.Conv2d(in_channels=dim, out_channels=latent_dim,
+                                 kernel_size=1, stride=1, padding=0)]
         self.model = nn.Sequential(*self.model)
         self.output_dim = dim
 

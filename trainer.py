@@ -42,8 +42,8 @@ class Trainer(nn.Module):
 
         self.dis_scheduler = get_scheduler(self.dis_opt, cfg)
         self.gen_scheduler = get_scheduler(self.gen_opt, cfg)
-        self.apply(weights_init(cfg['init'])) # Kaiming initialization
-        self.model.gen_test = copy.deepcopy(self.model.gen) # copy of initial
+        self.apply(weights_init(cfg['init']))  # Kaiming initialization
+        self.model.gen_test = copy.deepcopy(self.model.gen)  # copy of initial
 
     def gen_update(self, co_data, cl_data, hp, multigpus):
         self.gen_opt.zero_grad() # zero-out grad first
@@ -54,7 +54,7 @@ class Trainer(nn.Module):
         self.loss_gen_recon_s = torch.mean(sr)
         self.loss_gen_adv = torch.mean(ad)
         self.accuracy_gen_adv = torch.mean(ac)
-        self.gen_opt.step() # backward pass is already performed in self.model.gen_update
+        self.gen_opt.step()  # backward pass is already performed in self.model.gen_update
 
         this_model = self.model.module if multigpus else self.model
         update_average(this_model.gen_test, this_model.gen)
@@ -117,8 +117,8 @@ class Trainer(nn.Module):
     def translate(self, co_data, cl_data):
         return self.model.translate(co_data, cl_data)
 
-    def translate_k_shot(self, co_data, cl_data, k, mode):
-        return self.model.translate_k_shot(co_data, cl_data, k, mode)
+    def translate_k_shot(self, co_data, cl_data, k):
+        return self.model.translate_k_shot(co_data, cl_data, k)
 
     def forward(self, *inputs):
         print('Forward function not implemented.')

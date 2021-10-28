@@ -5,7 +5,6 @@ Licensed under the CC BY-NC-SA 4.0 license
 """
 import torch
 import os
-import sys
 import argparse
 import shutil
 
@@ -21,15 +20,15 @@ cudnn.benchmark = True
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--config', type=str,
-                    default='configs/funit_animals.yaml',
+                    default='configs/funit_cub.yaml',
                     help='configuration file for training and testing')
 
 parser.add_argument('--output_path', type=str,
-                    default='.', help="outputs path")
-parser.add_argument('--multigpus', default=True, action="store_true")
-parser.add_argument("--resume", default=True, action="store_true")
+                    default='checkpoints/cub200', help="outputs path")
+parser.add_argument('--multigpus', default=False, action="store_true")
+parser.add_argument("--resume", default=False, action="store_true")
 
-parser.add_argument('--batch_size', type=int, default=32)
+parser.add_argument('--batch_size', type=int, default=4)
 parser.add_argument('--test_batch_size', type=int, default=4)
 opts = parser.parse_args()
 

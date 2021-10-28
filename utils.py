@@ -40,16 +40,16 @@ def loader_from_list(
 
     transform_list = [transforms.ToTensor(),
                       transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
-    if center_crop:
-        transform_list = [transforms.CenterCrop((height, width))] + \
-                         transform_list if crop else transform_list
-    else:
-        transform_list = [transforms.RandomCrop((height, width))] + \
-                         transform_list if crop else transform_list
-    transform_list = [transforms.Resize(new_size)] + transform_list \
-        if new_size is not None else transform_list
+    if crop:
+        if center_crop:
+            transform_list = [transforms.CenterCrop((height, width))] + transform_list
+        else:
+            transform_list = [transforms.RandomCrop((height, width))] + transform_list
+    if new_size is not None:
+        transform_list = [transforms.Resize(new_size)] + transform_list
     if not center_crop:
         transform_list = [transforms.RandomHorizontalFlip()] + transform_list
+
     transform = transforms.Compose(transform_list)
     dataset = ImageLabelFilelist(root,
                                  file_list,

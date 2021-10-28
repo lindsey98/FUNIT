@@ -7,7 +7,7 @@ import copy
 
 import torch
 import torch.nn as nn
-
+import torch.nn.functional as F
 from networks import FewShotGen, GPPatchMcResDis
 
 
@@ -71,11 +71,11 @@ class FUNITModel(nn.Module):
             ##### Regularization on over-large gradient in discriminator
             l_reg_pre = self.dis.calc_grad2(resp_r, xb)
             l_reg = 10 * l_reg_pre
-            l_reg.backward()
+            l_reg.backward(retain_graph=True)
 
             ###### Equation 4 Discriminator Loss #######
             l_real = hp['gan_w'] * l_real_pre # D loss on real image
-            l_real.backward(retain_graph=True)
+            l_real.backward()
 
             with torch.no_grad():
                 c_xa = self.gen.enc_content(xa)
@@ -134,7 +134,7 @@ class FUNITModel(nn.Module):
         else:
             s_xb_current_before = self.gen_test.enc_class_model(xb)
             s_xb_current_after = s_xb_current_before.squeeze(-1).permute(1, 2, 0)
-            s_xb_current_pool = torch.nn.functional.avg_pool1d(s_xb_current_after, k)
+            s_xb_current_pool = F.avg_pool1d(s_xb_current_after, k)
             s_xb_current = s_xb_current_pool.permute(2, 0, 1).unsqueeze(-1)
             xt_current = self.gen_test.decode(c_xa_current, s_xb_current)
         return xt_current
@@ -145,7 +145,7 @@ class FUNITModel(nn.Module):
         style_batch = style_batch.cuda()
         s_xb_before = self.gen_test.enc_class_model(style_batch)
         s_xb_after = s_xb_before.squeeze(-1).permute(1, 2, 0)
-        s_xb_pool = torch.nn.functional.avg_pool1d(s_xb_after, k)
+        s_xb_pool = F.avg_pool1d(s_xb_after, k)
         s_xb = s_xb_pool.permute(2, 0, 1).unsqueeze(-1)
         return s_xb
 
