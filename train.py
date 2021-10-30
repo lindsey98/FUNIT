@@ -22,11 +22,11 @@ os.environ["CUDA_VISIBLE_DEVICES"]="1, 0"
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--config', type=str,
-                    default='configs/funit_cub.yaml',
+                    default='configs/funit_cars.yaml',
                     help='configuration file for training and testing')
 
 parser.add_argument('--output_path', type=str,
-                    default='checkpoints/cub200', help="outputs path")
+                    default='checkpoints/cars196', help="outputs path")
 parser.add_argument('--multigpus', default=True, action="store_true")
 parser.add_argument("--resume", default=False, action="store_true")
 

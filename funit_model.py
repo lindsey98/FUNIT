@@ -100,13 +100,24 @@ class FUNITModel(nn.Module):
         self.gen_test.eval()
         xa = co_data[0].cuda()
         xb = cl_data[0].cuda()
+        la = co_data[1]
+        print(la)
+        lb = cl_data[1]
+        print(lb)
 
         ## The following are produced by the current trained generator
         c_xa_current = self.gen.enc_content(xa)
+        # print(c_xa_current.shape)
         s_xa_current = self.gen.enc_class_model(xa)
+        # print(s_xa_current.shape)
         s_xb_current = self.gen.enc_class_model(xb)
+        # print(s_xb_current.shape)
+
         xt_current = self.gen.decode(c_xa_current, s_xb_current)
+        # print(xt_current.shape)
+
         xr_current = self.gen.decode(c_xa_current, s_xa_current)
+        # print(xr_current.shape)
 
         ## The following are produced by the initial generator before training
         c_xa = self.gen_test.enc_content(xa)

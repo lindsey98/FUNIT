@@ -49,13 +49,13 @@ class GPPatchMcResDis(nn.Module):
                              pad_type='reflect',
                              norm='none',
                              activation='none')] # image (B,3,H,W) --> (B,nf,H,W)
-
+        #
         for i in range(self.n_layers - 1):
             nf_out = np.min([nf * 2, 1024])
             cnn_f += [ActFirstResBlock(nf, nf, None, 'lrelu', 'none')]
             cnn_f += [ActFirstResBlock(nf, nf_out, None, 'lrelu', 'none')]
             cnn_f += [nn.ReflectionPad2d(1)]
-            cnn_f += [nn.AvgPool2d(kernel_size=3, stride=2)] # (B,nf,H,W) --> (B,nf_out,H,W) everytime channel depth grows twice upper bound is 1024
+            cnn_f += [nn.AvgPool2d(kernel_size=3, stride=2)] # (B,nf,H,W) --> (B,nf*2,H/2,W/2) everytime channel depth grows twice upper bound is 1024
             nf = np.min([nf * 2, 1024])
 
         nf_out = np.min([nf * 2, 1024])
@@ -84,7 +84,7 @@ class GPPatchMcResDis(nn.Module):
         resp_fake, gan_feat = self.forward(input_fake, input_label)
         total_count = torch.tensor(np.prod(resp_fake.size()),
                                    dtype=torch.float).cuda() # total is BxWxH
-        fake_loss = torch.nn.ReLU()(1.0 + resp_fake).mean() # face loss = [1 + out]+, out is of shape (B,H,W)
+        fake_loss = torch.nn.ReLU()(1.0 + resp_fake).mean() # face loss = [1 + out]+, fake_loss is of shape (B,)
         correct_count = (resp_fake < 0).sum() # fake image should be classified as fake, i.e. <0
         fake_accuracy = correct_count.type_as(fake_loss) / total_count
         return fake_loss, fake_accuracy, resp_fake

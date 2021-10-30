@@ -53,13 +53,13 @@ class ImageLabelFilelist(data.Dataset):
         return len(self.imgs)
 
 def prepare_data_list(root, data_name):
-    train_root = os.path.join(root, 'train_sub')
-    val_root = os.path.join(root, 'val')
-    test_root = os.path.join(root, 'test')
+    train_root = os.path.join(root, 'train')
+    # val_root = os.path.join(root, 'val')
+    # test_root = os.path.join(root, 'test')
 
-    train_txt = './datasets/{}_train.txt'.format(data_name)
-    val_txt = './datasets/{}_val.txt'.format(data_name)
-    test_txt = './datasets/{}_test.txt'.format(data_name)
+    train_txt = './datasets/{}_trainall.txt'.format(data_name)
+    # val_txt = './datasets/{}_val.txt'.format(data_name)
+    # test_txt = './datasets/{}_test.txt'.format(data_name)
 
     for folder in os.listdir(os.path.join(train_root)):
         for file in os.listdir(os.path.join(train_root, folder)):
@@ -68,31 +68,31 @@ def prepare_data_list(root, data_name):
                                      file))
                 f.write('\n')
 
-    for folder in os.listdir(os.path.join(val_root)):
-        for file in os.listdir(os.path.join(val_root, folder)):
-            with open(val_txt, 'a+') as f:
-                f.write(os.path.join( folder,
-                                      file))
-                f.write('\n')
-
-
-    for folder in os.listdir(os.path.join(test_root)):
-        for file in os.listdir(os.path.join(test_root, folder)):
-            with open(test_txt, 'a+') as f:
-                f.write(os.path.join(folder,
-                                     file))
-                f.write('\n')
-
-
+    # for folder in os.listdir(os.path.join(val_root)):
+    #     for file in os.listdir(os.path.join(val_root, folder)):
+    #         with open(val_txt, 'a+') as f:
+    #             f.write(os.path.join( folder,
+    #                                   file))
+    #             f.write('\n')
+    #
+    #
+    # for folder in os.listdir(os.path.join(test_root)):
+    #     for file in os.listdir(os.path.join(test_root, folder)):
+    #         with open(test_txt, 'a+') as f:
+    #             f.write(os.path.join(folder,
+    #                                  file))
+    #             f.write('\n')
+    #
+    #
 if __name__ == '__main__':
-    # prepare_data_list(root='/home/ruofan/PycharmProjects/SoftTriple/datasets/logo2k',
-    #                   data_name='logo2k')
+    prepare_data_list(root='/home/ruofan/PycharmProjects/SoftTriple/datasets/logo2k',
+                      data_name='logo2k')
 
-    root = '/home/ruofan/PycharmProjects/SoftTriple/datasets/logo2k'
-    train_root = os.path.join(root, 'train_sub')
-    ct = 0
-    for folder in os.listdir(os.path.join(train_root)):
-        for file in os.listdir(os.path.join(train_root, folder)):
-            ct += 1
-
-    print(ct)
+    # root = '/home/ruofan/PycharmProjects/SoftTriple/datasets/cub'
+    # train_root = os.path.join(root, 'train')
+    # ct = 0
+    # for folder in os.listdir(os.path.join(train_root)):
+    #     for file in os.listdir(os.path.join(train_root, folder)):
+    #         ct += 1
+    #
+    # print(ct)
