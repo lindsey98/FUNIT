@@ -16,7 +16,6 @@ cudnn.benchmark = True
 os.environ["CUDA_VISIBLE_DEVICES"]="1, 0"
 
 
-
 parser = argparse.ArgumentParser()
 parser.add_argument('--config', type=str,
                     default='configs/funit_cub.yaml',

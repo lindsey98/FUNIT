@@ -43,7 +43,7 @@ class Trainer(nn.Module):
         self.dis_scheduler = get_scheduler(self.dis_opt, cfg)
         self.gen_scheduler = get_scheduler(self.gen_opt, cfg)
         self.apply(weights_init(cfg['init']))  # Kaiming initialization
-        self.model.gen_test = copy.deepcopy(self.model.gen)  # copy of initial
+        self.model.gen_test = copy.deepcopy(self.model.gen)  # gen_test is the running average of all generators trained until now
 
     def gen_update(self, co_data, cl_data, hp, multigpus):
         self.gen_opt.zero_grad() # zero-out grad first
