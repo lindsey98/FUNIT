@@ -23,6 +23,36 @@ def update_average(model_tgt, model_src, beta=0.999):
             assert(p_src is not p_tgt)
             p_tgt.copy_(beta*p_tgt + (1. - beta)*p_src)
 
+def dataset_from_list(root,
+        file_list,
+        batch_size,
+        new_size=None,
+        height=128,
+        width=128,
+        crop=True,
+        num_workers=4,
+        shuffle=True,
+        center_crop=False,
+        return_paths=False,
+        drop_last=True):
+    transform_list = [transforms.ToTensor(),
+                      transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
+    if crop:
+        if center_crop:
+            transform_list = [transforms.CenterCrop((height, width))] + transform_list
+        else:
+            transform_list = [transforms.RandomCrop((height, width))] + transform_list
+    if new_size is not None:
+        transform_list = [transforms.Resize(new_size)] + transform_list
+    if not center_crop:
+        transform_list = [transforms.RandomHorizontalFlip()] + transform_list
+
+    transform = transforms.Compose(transform_list)
+    dataset = ImageLabelFilelist(root,
+                                 file_list,
+                                 transform,
+                                 return_paths=return_paths)
+    return dataset
 
 def loader_from_list(
         root,

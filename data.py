@@ -6,6 +6,7 @@ Licensed under the CC BY-NC-SA 4.0 license
 import os.path
 from PIL import Image
 import torch.utils.data as data
+from torch.utils.data.sampler import Sampler, SubsetRandomSampler
 
 def default_loader(path):
     return Image.open(path).convert('RGB')
@@ -17,6 +18,19 @@ def default_filelist_reader(filelist):
             im_path = line.strip()
             im_list.append(im_path)
     return im_list
+
+class SubSampler(Sampler):
+    '''
+    Customized sampler to subsample data
+    '''
+    def __init__(self, idlist):
+        self.idlist = idlist
+
+    def __iter__(self):
+        return iter(self.idlist)
+
+    def __len__(self):
+        return len(self.idlist)
 
 class ImageLabelFilelist(data.Dataset):
     def __init__(self, root,
@@ -32,6 +46,7 @@ class ImageLabelFilelist(data.Dataset):
         self.classes = sorted(list(set([path.split('/')[0] for path in self.im_list]))) # get the class labels for each files
         self.class_to_idx = {self.classes[i]: i for i in range(len(self.classes))}
         self.imgs = [(im_path, self.class_to_idx[im_path.split('/')[0]]) for im_path in self.im_list]
+        self.targets = [im[1] for im in self.imgs]
         self.return_paths = return_paths
         print('Data loader')
         print("\tRoot: %s" % root)

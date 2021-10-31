@@ -101,9 +101,9 @@ class FUNITModel(nn.Module):
         xa = co_data[0].cuda()
         xb = cl_data[0].cuda()
         la = co_data[1]
-        print(la)
+        # print(la)
         lb = cl_data[1]
-        print(lb)
+        # print(lb)
 
         ## The following are produced by the current trained generator
         c_xa_current = self.gen.enc_content(xa)
