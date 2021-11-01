@@ -126,36 +126,40 @@ class GPPatchMcResDis(nn.Module):
         nf_out = np.min([nf, 1024])
         cnn_f += [ActFirstResBlock(nf, nf, None, 'lrelu', 'none')]
         cnn_f += [ActFirstResBlock(nf, nf_out, None, 'lrelu', 'none')]
-        cnn_f += [nn.AdaptiveAvgPool2d(1)]
         cnn_f += [Conv2dBlock(nf_out, hp['sz_embed'], 1, 1,
                              norm='none',
                              activation='lrelu', # leaky relu
                              activation_first=True)]
-        self.cnn_f = nn.Sequential(*cnn_f) # (B,sz_embed,1,1)
+        self.cnn_f = nn.Sequential(*cnn_f) # (B,sz_embed,H,W)
 
         cnn_c = [Conv2dBlock(hp['sz_embed'], hp['num_classes'], 1, 1,
                              norm='none',
                              activation='lrelu', # leaky relu
                              activation_first=True)]
-        self.cnn_c = nn.Sequential(*cnn_c) # (B,sz_embed,1,1) -> (B,1,1,1)
+        self.cnn_c = nn.Sequential(*cnn_c) # (B,sz_embed,H,W) -> (B,C,H,W)
 
-        self.proxies = torch.nn.Parameter(torch.randn(hp['num_classes'], hp['sz_embed']) / 8)
         self.scale = 3.
 
     def forward(self, x, y):
         assert(x.size(0) == y.size(0))
-        feat = self.cnn_f(x) # (B,sz_embed,1,1)
-        out = self.cnn_c(feat) # (B,C,1,1) for discriminating fake/real
-        out = out[torch.arange(out.size()[0]), y, :, :] # (B,1,1) take corresponding channel
+        feat = self.cnn_f(x) # (B,sz_embed,H,W)
+        out = self.cnn_c(feat) # (B,C,H,W) for discriminating fake/real
+        out = out[torch.arange(out.size()[0]), y, :, :] # (B,H,W) take corresponding channel
+
+        feat = F.adaptive_avg_pool2d(feat, 1) # pooled over H, W
         feat = feat.squeeze()
         return out, feat
 
-    def calc_metric_learning_loss(self, xfeat, yfeat, lx, ly, xhatfeat):
+    def calc_metric_learning_loss(self, inputxa, inputxb, inputxt, la, lb, proxies):
 
-        P = self.proxies
+        _, xb_gan_feat = self.forward(inputxb, lb)
+        _, xa_gan_feat = self.forward(inputxa, la)
+        _, xt_gan_feat = self.forward(inputxt.detach(), la)
+
+        P = proxies
         P = self.scale * F.normalize(P, p=2, dim=-1)
 
-        X = torch.cat((xfeat, yfeat, xhatfeat), dim=0)
+        X = torch.cat((xa_gan_feat, xb_gan_feat, xt_gan_feat), dim=0)
         X = self.scale * F.normalize(X, p=2, dim=-1)
 
         D = pairwise_distance(
@@ -165,9 +169,9 @@ class GPPatchMcResDis(nn.Module):
             squared=True
         )[0][:X.size()[0], X.size()[0]:]
 
-        TX = binarize_and_smooth_labels(T=lx, nb_classes=len(P), smoothing_const=0)
-        TY = binarize_and_smooth_labels(T=ly, nb_classes=len(P), smoothing_const=0)
-        TXhat = 0.5 * TX + 0.5 * TY # label interpolation half-half
+        TX = binarize_and_smooth_labels(T=la, nb_classes=len(P), smoothing_const=0)
+        TY = binarize_and_smooth_labels(T=lb, nb_classes=len(P), smoothing_const=0)
+        TXhat = 0.5*TX + 0.5*TY # label interpolation half-half
         Tall = torch.cat((TX, TY, TXhat), dim=0)
 
         loss = torch.sum(- Tall * F.log_softmax(-D, -1), -1)

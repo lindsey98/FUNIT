@@ -15,6 +15,8 @@ from utils import write_loss, write_html, write_1images, Timer
 from trainer_mixed import Trainer
 
 import torch.backends.cudnn as cudnn
+import dataset
+import json
 # Enable auto-tuner to find the best algorithm to use for your hardware.
 cudnn.benchmark = True
 os.environ["CUDA_VISIBLE_DEVICES"]="1, 0"
@@ -24,19 +26,34 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--config', type=str,
                     default='configs/funit_cub_mixed.yaml',
                     help='configuration file for training and testing')
-
 parser.add_argument('--output_path', type=str,
-                    default='checkpoints/cub200_simpler', help="outputs path")
+                    default='checkpoints/cub200_mixed', help="outputs path")
 parser.add_argument('--multigpus', default=True, action="store_true")
 parser.add_argument("--resume", default=False, action="store_true")
-
-parser.add_argument('--batch_size', type=int, default=4)
-parser.add_argument('--test_batch_size', type=int, default=4)
+parser.add_argument('--batch_size', type=int, default=8)
+parser.add_argument('--test_batch_size', type=int, default=32)
+parser.add_argument('--dataset', type=str, default='cub')
+parser.add_argument('--workers', default = 16, type=int, dest = 'nb_workers')
 opts = parser.parse_args()
+
+def load_config(config_name = 'config.json'):
+    '''
+        Load config.json file
+    '''
+    config = json.load(open(config_name))
+    def eval_json(config):
+        for k in config:
+            if type(config[k]) != dict:
+                config[k] = eval(config[k])
+            else:
+                eval_json(config[k])
+    eval_json(config)
+    return config
 
 if __name__ == '__main__':
     # Load experiment setting
     config = get_config(opts.config)
+    print(config)
     max_iter = config['max_iter']
 
     # Override the batch size if specified.
@@ -54,10 +71,61 @@ if __name__ == '__main__':
     else:
         config['gpus'] = 1
 
-    # dataloader
-    loaders = get_train_loaders(config)
-    train_content_loader, train_class_loader = loaders[0], loaders[1]
-    test_content_loader, test_class_loader = loaders[2], loaders[3]
+    # TODO classbalanced dataloader
+    dataset_config = load_config('dataset/config.json')
+    transform_key = 'transform_parameters'
+    train_transform = dataset.utils.make_transform(
+                **dataset_config[transform_key]
+    )
+    tr_dataset = dataset.load(
+        name=opts.dataset,
+        root=dataset_config['dataset'][opts.dataset]['root'],
+        source=dataset_config['dataset'][opts.dataset]['source'],
+        classes=dataset_config['dataset'][opts.dataset]['classes']['trainval'],
+        transform=train_transform,
+    )
+    num_class_per_batch = 8
+    batch_sampler = dataset.utils.BalancedBatchSampler(torch.Tensor(tr_dataset.ys), num_class_per_batch,
+                                                       int(opts.batch_size / num_class_per_batch))
+
+    # training loader
+    dl_tr = torch.utils.data.DataLoader(
+        tr_dataset,
+        batch_sampler = batch_sampler,
+        num_workers = opts.nb_workers,
+    )
+
+    dl_tr_noshuffle = torch.utils.data.DataLoader(
+            dataset=dataset.load(
+                    name=opts.dataset,
+                    root=dataset_config['dataset'][opts.dataset]['root'],
+                    source=dataset_config['dataset'][opts.dataset]['source'],
+                    classes=dataset_config['dataset'][opts.dataset]['classes']['trainval'],
+                    transform=dataset.utils.make_transform(
+                        **dataset_config[transform_key],
+                        is_train=False
+                    )
+                ),
+            num_workers = opts.nb_workers,
+            shuffle=False,
+            batch_size=64,
+    )
+
+    dl_ev = torch.utils.data.DataLoader(
+        dataset.load(
+            name=opts.dataset,
+            root=dataset_config['dataset'][opts.dataset]['root'],
+            source=dataset_config['dataset'][opts.dataset]['source'],
+            classes=dataset_config['dataset'][opts.dataset]['classes']['eval'],
+            transform=dataset.utils.make_transform(
+                **dataset_config[transform_key],
+                is_train=False
+            )
+        ),
+        batch_size=opts.batch_size,
+        shuffle=False,
+        num_workers=opts.nb_workers,
+    )
 
     # Setup logger and output folders
     model_name = os.path.splitext(os.path.basename(opts.config))[0]
@@ -66,52 +134,25 @@ if __name__ == '__main__':
     checkpoint_directory, image_directory = make_result_folders(output_directory)
     shutil.copy(opts.config, os.path.join(output_directory, 'config.yaml'))
 
-    # iterations = trainer.resume(checkpoint_directory,
-    #                             hp=config,
-    #                             multigpus=opts.multigpus) if opts.resume else 0
+    iterations = trainer.resume(checkpoint_directory,
+                                hp=config,
+                                multigpus=opts.multigpus) if opts.resume else 0
 
     while True:
-        for it, (co_data, cl_data) in enumerate(zip(train_content_loader, train_class_loader)):
+        for it, (x, y, indices) in enumerate(dl_tr):
             with Timer("Elapsed time in update: %f"):
-                d_acc = trainer.dis_update(co_data, cl_data, config)
+                co_data = (x[:opts.batch_size//2], y[:opts.batch_size//2])
+                cl_data = (x[opts.batch_size//2:], y[opts.batch_size//2:])
+                d_acc = trainer.dis_update(co_data, cl_data, config,
+                                           opts.multigpus)
                 g_acc = trainer.gen_update(co_data, cl_data, config,
                                            opts.multigpus)
-                exit()
                 torch.cuda.synchronize()
                 print('D acc: %.4f\t G acc: %.4f' % (d_acc, g_acc))
 
             if (iterations + 1) % config['log_iter'] == 0:
                 print("Iteration: %08d/%08d" % (iterations + 1, max_iter))
                 write_loss(iterations, trainer, train_writer)
-
-            '''
-            if ((iterations + 1) % config['image_save_iter'] == 0 or (
-                    iterations + 1) % config['image_display_iter'] == 0):
-                if (iterations + 1) % config['image_save_iter'] == 0:
-                    key_str = '%08d' % (iterations + 1)
-                    write_html(output_directory + "/index.html", iterations + 1,
-                               config['image_save_iter'], 'images')
-                else:
-                    key_str = 'current'
-                    
-                with torch.no_grad():
-                    for t, (val_co_data, val_cl_data) in enumerate(zip(train_content_loader, train_class_loader)):
-                        if t >= opts.test_batch_size:
-                            break
-                        val_image_outputs = trainer.test(val_co_data, val_cl_data,
-                                                         opts.multigpus)
-                        write_1images(val_image_outputs, image_directory,
-                                      'train_%s_%02d' % (key_str, t))
-                        
-                    for t, (test_co_data, test_cl_data) in enumerate(zip(test_content_loader, test_class_loader)):
-                        if t >= opts.test_batch_size:
-                            break
-                        test_image_outputs = trainer.test(test_co_data,
-                                                          test_cl_data,
-                                                          opts.multigpus)
-                        write_1images(test_image_outputs, image_directory,
-                                      'test_%s_%02d' % (key_str, t))
-            '''
 
             if (iterations + 1) % config['snapshot_save_iter'] == 0:
                 trainer.save(checkpoint_directory, iterations, opts.multigpus)
@@ -121,3 +162,11 @@ if __name__ == '__main__':
             if iterations >= max_iter:
                 print("Finish Training")
                 exit()
+
+        # if e % 5 ==0:
+        #     # get recalls
+        #     with torch.no_grad():
+        #         (_, _, _, _, _, _), (_, _, xa_feat, xb_feat) = \
+        #             trainer.test(co_data, cl_data, opts.multigpus)
+        #         nmi, recall = utils.evaluate(model, dl_val, args.eval_nmi, args.recall)
+        #

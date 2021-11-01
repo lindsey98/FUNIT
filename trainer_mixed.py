@@ -30,8 +30,11 @@ class Trainer(nn.Module):
         self.model = FUNITModel(cfg)
         lr_gen = cfg['lr_gen']
         lr_dis = cfg['lr_dis']
+        lr_proxy = cfg['lr_proxy']
+
         dis_params = list(self.model.dis.parameters())
         gen_params = list(self.model.gen.parameters())
+        proxies_params = self.model.proxies
 
         self.dis_opt = torch.optim.RMSprop(
             [p for p in dis_params if p.requires_grad],
@@ -39,20 +42,27 @@ class Trainer(nn.Module):
         self.gen_opt = torch.optim.RMSprop(
             [p for p in gen_params if p.requires_grad],
             lr=lr_dis, weight_decay=cfg['weight_decay'])
+        self.proxy_opt = torch.optim.RMSprop(
+            [proxies_params],
+            lr=lr_proxy, weight_decay=cfg['weight_decay'])
 
         self.dis_scheduler = get_scheduler(self.dis_opt, cfg)
         self.gen_scheduler = get_scheduler(self.gen_opt, cfg)
+        self.proxy_scheduler = get_scheduler(self.proxy_opt, cfg)
         self.apply(weights_init(cfg['init']))  # Kaiming initialization
+
         self.model.gen_test = copy.deepcopy(self.model.gen)  # copy of initial
+        self.model.dis_test = copy.deepcopy(self.model.dis)  # copy of initial
 
     def gen_update(self, co_data, cl_data, hp, multigpus):
         self.gen_opt.zero_grad() # zero-out grad first
         al, ad, xr, cr, sr, ac = self.model(co_data, cl_data, hp, 'gen_update')
         self.loss_gen_total = torch.mean(al)
-        self.loss_gen_recon_x = torch.mean(xr)
-        self.loss_gen_recon_c = torch.mean(cr)
-        self.loss_gen_recon_s = torch.mean(sr)
+        self.loss_gen_recon_x = torch.mean(xr) # reconstruction error for xa
+        self.loss_gen_recon_c = torch.mean(cr) # feature matching for D_f(xa), D_f(xa_hat)
+        self.loss_gen_recon_s = torch.mean(sr) # feature matching for D_f(xt), [D_f(xa)+D_f(xb)]/2
         self.loss_gen_adv = torch.mean(ad)
+
         self.accuracy_gen_adv = torch.mean(ac)
         self.gen_opt.step()  # backward pass is already performed in self.model.gen_update
 
@@ -60,16 +70,22 @@ class Trainer(nn.Module):
         update_average(this_model.gen_test, this_model.gen)
         return self.accuracy_gen_adv.item()
 
-    def dis_update(self, co_data, cl_data, hp):
+    def dis_update(self, co_data, cl_data, hp, multigpus):
         self.dis_opt.zero_grad() # zero-out grad first
+        self.proxy_opt.zero_grad()
         al, lfa, lre, reg, lmetric, acc = self.model(co_data, cl_data, hp, 'dis_update')
         self.loss_dis_total = torch.mean(al)
         self.loss_dis_fake_adv = torch.mean(lfa)
         self.loss_dis_real_adv = torch.mean(lre)
         self.loss_dis_reg = torch.mean(reg)
+        self.loss_metric = torch.mean(lmetric)
+
         self.accuracy_dis_adv = torch.mean(acc)
-        self.loss_metric = lmetric
         self.dis_opt.step() # backward pass is already performed in self.model.gen_update
+        self.proxy_opt.step()
+
+        this_model = self.model.module if multigpus else self.model
+        update_average(this_model.dis_test, this_model.dis)
         return self.accuracy_dis_adv.item()
 
     def test(self, co_data, cl_data, multigpus):
@@ -88,6 +104,7 @@ class Trainer(nn.Module):
         last_model_name = get_model_list(checkpoint_dir, "dis")
         state_dict = torch.load(last_model_name)
         this_model.dis.load_state_dict(state_dict['dis'])
+        this_model.dis_test.load_state_dict(state_dict['dis_test'])
 
         state_dict = torch.load(os.path.join(checkpoint_dir, 'optimizer.pt'))
         self.dis_opt.load_state_dict(state_dict['dis'])
@@ -104,26 +121,15 @@ class Trainer(nn.Module):
         gen_name = os.path.join(snapshot_dir, 'gen_%08d.pt' % (iterations + 1))
         dis_name = os.path.join(snapshot_dir, 'dis_%08d.pt' % (iterations + 1))
         opt_name = os.path.join(snapshot_dir, 'optimizer.pt')
+        proxy_name = os.path.join(snapshot_dir, 'proxy_%08d.pt' % (iterations + 1))
+
         torch.save({'gen': this_model.gen.state_dict(),
                     'gen_test': this_model.gen_test.state_dict()}, gen_name)
-        torch.save({'dis': this_model.dis.state_dict()}, dis_name)
+        torch.save({'dis': this_model.dis.state_dict(),
+                    'dis_test': this_model.dis_test.state_dict()}, dis_name)
         torch.save({'gen': self.gen_opt.state_dict(),
                     'dis': self.dis_opt.state_dict()}, opt_name)
-
-    def load_ckpt(self, ckpt_name):
-        state_dict = torch.load(ckpt_name)
-        self.model.gen.load_state_dict(state_dict['gen'])
-        self.model.gen_test.load_state_dict(state_dict['gen_test'])
-
-    def translate(self, co_data, cl_data):
-        return self.model.translate(co_data, cl_data)
-
-    def translate_k_shot(self, co_data, cl_data, k):
-        return self.model.translate_k_shot(co_data, cl_data, k)
-
-    def forward(self, *inputs):
-        print('Forward function not implemented.')
-        pass
+        torch.save({'proxies': this_model.proxies}, proxy_name)
 
 
 def get_model_list(dirname, key):

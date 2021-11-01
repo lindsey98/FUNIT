@@ -20,6 +20,8 @@ class FUNITModel(nn.Module):
         self.gen = FewShotGen(hp['gen']) # generater
         self.dis = GPPatchMcResDis(hp['dis']) # discriminator
         self.gen_test = copy.deepcopy(self.gen)
+        self.dis_test = copy.deepcopy(self.dis)
+        self.proxies = torch.nn.Parameter(torch.randn(hp['dis']['num_classes'], hp['dis']['sz_embed']) / 8)
 
     def forward(self, co_data, cl_data, hp, mode):
 
@@ -62,10 +64,7 @@ class FUNITModel(nn.Module):
 
         elif mode == 'dis_update':
             xb.requires_grad_()
-            l_real_pre, acc_r, resp_r = self.dis.calc_dis_real_loss(xb, lb)
-            # loss of discriminator (distinguish that xb is real, and classify xb as correct label)
-            # discrimination accuracy
-            # xb intermediate feature map from discriminator of shape (?, nf_out, H, W)
+            l_real_pre, acc_r, resp_r = self.dis.calc_dis_real_loss(xb, lb) # loss of discriminator (distinguish that xb is real, and classify xb as correct label)
 
             ##### Regularization on gradient in discriminator on REAL images
             l_reg_pre = self.dis.calc_grad2(resp_r, xb)
@@ -86,12 +85,9 @@ class FUNITModel(nn.Module):
             l_fake.backward()
 
             ######## Metric Learning Loss ########
-            _, xb_gan_feat = self.dis(xb.detach(), lb)
-            _, xa_gan_feat = self.dis(xa, la)
-            _, xt_gan_feat = self.dis(xt.detach(), la) # FIXME: detach xt or not
-            l_metric = self.dis.calc_metric_learning_loss(xa_gan_feat, xb_gan_feat,
-                                                          la, lb,
-                                                          xt_gan_feat)
+             # FIXME: detach xt or not
+            l_metric = self.dis.calc_metric_learning_loss(xa, xb, xt.detach(), la, lb, self.proxies)
+            l_metric = 10 * hp['gan_w'] * l_metric
             l_metric.backward()
 
             l_total = l_fake + l_real + l_reg + l_metric
@@ -106,8 +102,11 @@ class FUNITModel(nn.Module):
         self.eval()
         self.gen.eval()
         self.gen_test.eval()
+        self.dis_test.eval()
         xa = co_data[0].cuda()
         xb = cl_data[0].cuda()
+        la = co_data[1].cuda()
+        lb = cl_data[1].cuda()
 
         ## The following are produced by the current trained generator
         c_xa_current, z_xa_current = self.gen.enc_content(xa)
@@ -116,7 +115,7 @@ class FUNITModel(nn.Module):
         xt_current = self.gen.decode(c_xa_current, s_xb_current)
         xr_current = self.gen.decode(c_xa_current, s_xa_current)
 
-        ## The following are produced by the initial generator before training
+        ## The following are produced by the historical average generator before training
         c_xa, z_xa = self.gen_test.enc_content(xa)
         s_xa = self.gen_test.enc_class_model(xa)
         s_xb = self.gen_test.enc_class_model(xb)
@@ -124,8 +123,15 @@ class FUNITModel(nn.Module):
         xt = self.gen_test.decode(c_xa, s_xb)
         xr = self.gen_test.decode(c_xa, s_xa)
 
+        # The following are produced by current discriminator
+        _, xa_feat_current = self.dis(xa, la)
+        _, xb_feat_current = self.dis(xb, lb)
+        # The following are produced by the historical average discriminator
+        _, xa_feat = self.dis_test(xa, la)
+        _, xb_feat = self.dis_test(xb, lb)
+
         self.train()
-        return xa, xr_current, xt_current, xb, xr, xt
+        return (xa, xr_current, xt_current, xb, xr, xt), (xa_feat_current, xb_feat_current, xa_feat, xb_feat)
 
     def translate_k_shot(self, co_data, cl_data, k):
         '''
