@@ -9,6 +9,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from networks_mixed import FewShotGen, GPPatchMcResDis
+import time
+from utils import calc_recall_at_k, calc_normalized_mutual_information, cluster_by_kmeans, assign_by_euclidian_at_k
+import logging
+from tqdm import tqdm
 
 def recon_criterion(predict, target):
     return torch.mean(torch.abs(predict - target))
@@ -87,7 +91,7 @@ class FUNITModel(nn.Module):
             ######## Metric Learning Loss ########
              # FIXME: detach xt or not
             l_metric = self.dis.calc_metric_learning_loss(xa, xb, xt.detach(), la, lb, self.proxies)
-            l_metric = 10 * hp['gan_w'] * l_metric
+            l_metric = hp['gan_w'] * l_metric
             l_metric.backward()
 
             l_total = l_fake + l_real + l_reg + l_metric
@@ -132,6 +136,63 @@ class FUNITModel(nn.Module):
 
         self.train()
         return (xa, xr_current, xt_current, xb, xr, xt), (xa_feat_current, xb_feat_current, xa_feat, xb_feat)
+
+    @torch.no_grad()
+    def predict_batchwise(self, dataloader):
+        self.dis_test.eval()
+        X = torch.tensor([])
+        T = torch.tensor([])
+        # extract batches (A becomes list of samples)
+        for batch in tqdm(dataloader, desc="Batch-wise prediction"):
+            x, y, _ = batch
+            # move images to device of model (approximate device)
+            x, y = x.cuda(), y.cuda()
+            # predict model output for image
+            feat = self.dis_test.forward_partial(x, y)
+            X = torch.cat((X, feat.detach().cpu()), dim=0)
+            T = torch.cat((T, y.detach().cpu()), dim=0)
+        self.dis_test.train()
+        return X, T
+
+    @torch.no_grad()
+    def evaluate(self, dataloader, eval_nmi=True, recall_list=[1, 2, 4, 8]):
+        eval_time = time.time()
+        nb_classes = len(dataloader.dataset.classes)
+        # calculate embeddings with model and get targets
+        X, T = self.predict_batchwise(dataloader)
+        print('done collecting prediction')
+
+        if eval_nmi:
+            # calculate NMI with kmeans clustering
+            nmi = calc_normalized_mutual_information(
+                T,
+                cluster_by_kmeans(
+                    X, nb_classes
+                )
+            )
+        else:
+            nmi = 1
+
+        logging.info("NMI: {:.3f}".format(nmi * 100))
+
+        # get predictions by assigning nearest 8 neighbors with euclidian
+        max_dist = max(recall_list)
+        Y = assign_by_euclidian_at_k(X, T, max_dist)
+        Y = torch.from_numpy(Y)
+
+        # calculate recall @ 1, 2, 4, 8
+        recall = []
+        for k in recall_list:
+            r_at_k = calc_recall_at_k(T, Y, k)
+            recall.append(r_at_k)
+            logging.info("R@{} : {:.3f}".format(k, 100 * r_at_k))
+
+        chmean = (2 * nmi * recall[0]) / (nmi + recall[0])
+        logging.info("hmean: %s", str(chmean))
+
+        eval_time = time.time() - eval_time
+        logging.info('Eval time: %.2f' % eval_time)
+        return nmi, recall
 
     def translate_k_shot(self, co_data, cl_data, k):
         '''

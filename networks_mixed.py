@@ -144,11 +144,19 @@ class GPPatchMcResDis(nn.Module):
         assert(x.size(0) == y.size(0))
         feat = self.cnn_f(x) # (B,sz_embed,H,W)
         out = self.cnn_c(feat) # (B,C,H,W) for discriminating fake/real
-        out = out[torch.arange(out.size()[0]), y, :, :] # (B,H,W) take corresponding channel
+        print(y.long())
+        out = out[torch.arange(out.size()[0]), y.long(), :, :] # (B,H,W) take corresponding channel
 
         feat = F.adaptive_avg_pool2d(feat, 1) # pooled over H, W
         feat = feat.squeeze()
         return out, feat
+
+    def forward_partial(self, x, y):
+        assert(x.size(0) == y.size(0))
+        feat = self.cnn_f(x) # (B,sz_embed,H,W)
+        feat = F.adaptive_avg_pool2d(feat, 1) # pooled over H, W
+        feat = feat.squeeze()
+        return feat
 
     def calc_metric_learning_loss(self, inputxa, inputxb, inputxt, la, lb, proxies):
 

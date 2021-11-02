@@ -92,6 +92,10 @@ class Trainer(nn.Module):
         this_model = self.model.module if multigpus else self.model
         return this_model.test(co_data, cl_data)
 
+    def evaluate(self, dataloader, multigpus):
+        this_model = self.model.module if multigpus else self.model
+        return this_model.evaluate(dataloader)
+
     def resume(self, checkpoint_dir, hp, multigpus):
         this_model = self.model.module if multigpus else self.model
 
@@ -106,12 +110,18 @@ class Trainer(nn.Module):
         this_model.dis.load_state_dict(state_dict['dis'])
         this_model.dis_test.load_state_dict(state_dict['dis_test'])
 
+        last_model_name = get_model_list(checkpoint_dir, "proxy")
+        this_model.proxies = torch.load(last_model_name)['proxies']
+
         state_dict = torch.load(os.path.join(checkpoint_dir, 'optimizer.pt'))
         self.dis_opt.load_state_dict(state_dict['dis'])
         self.gen_opt.load_state_dict(state_dict['gen'])
+        self.proxy_opt.load_state_dict(state_dict['proxies'])
 
         self.dis_scheduler = get_scheduler(self.dis_opt, hp, iterations)
         self.gen_scheduler = get_scheduler(self.gen_opt, hp, iterations)
+        self.proxy_scheduler = get_scheduler(self.proxy_opt, hp, iterations)
+
         print('Resume from iteration %d' % iterations)
         return iterations
 
@@ -127,9 +137,11 @@ class Trainer(nn.Module):
                     'gen_test': this_model.gen_test.state_dict()}, gen_name)
         torch.save({'dis': this_model.dis.state_dict(),
                     'dis_test': this_model.dis_test.state_dict()}, dis_name)
-        torch.save({'gen': self.gen_opt.state_dict(),
-                    'dis': self.dis_opt.state_dict()}, opt_name)
         torch.save({'proxies': this_model.proxies}, proxy_name)
+
+        torch.save({'gen': self.gen_opt.state_dict(),
+                    'dis': self.dis_opt.state_dict(),
+                    'proxies': self.proxy_opt.state_dict()}, opt_name)
 
 
 def get_model_list(dirname, key):
