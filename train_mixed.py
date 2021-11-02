@@ -21,7 +21,6 @@ from tqdm import tqdm
 # Enable auto-tuner to find the best algorithm to use for your hardware.
 cudnn.benchmark = True
 os.environ["CUDA_VISIBLE_DEVICES"]="1, 0"
-# os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--config', type=str,
@@ -29,12 +28,13 @@ parser.add_argument('--config', type=str,
                     help='configuration file for training and testing')
 parser.add_argument('--output_path', type=str,
                     default='checkpoints/cub200_mixed', help="outputs path")
-parser.add_argument('--multigpus', default=False, action="store_true")
+parser.add_argument('--multigpus', default=True, action="store_true")
 parser.add_argument("--resume", default=False, action="store_true")
-parser.add_argument('--batch_size', type=int, default=8)
+parser.add_argument('--batch_size', default=8, type=int)
 parser.add_argument('--test_batch_size', type=int, default=32)
 parser.add_argument('--dataset', type=str, default='cub')
-parser.add_argument('--workers', default = 32, type=int, dest = 'nb_workers')
+parser.add_argument('--workers', default = 16, type=int, dest = 'nb_workers')
+parser.add_argument('--recall_list', default=[1,2,4,8], type=list)
 opts = parser.parse_args()
 
 def load_config(config_name = 'config.json'):
@@ -125,7 +125,7 @@ if __name__ == '__main__':
                 is_train=False
             )
         ),
-        batch_size=opts.batch_size,
+        batch_size=64,
         shuffle=False,
         num_workers=opts.nb_workers,
     )
@@ -141,8 +141,6 @@ if __name__ == '__main__':
                                 hp=config,
                                 multigpus=opts.multigpus) if opts.resume else 0
 
-    trainer.evaluate(dl_ev, opts.multigpus)
-
     while True:
         for it, (x, y, indices) in enumerate(dl_tr):
             with Timer("Elapsed time in update: %f"):
@@ -157,7 +155,11 @@ if __name__ == '__main__':
 
             if iterations == 0 or (iterations + 1) % config['log_iter'] == 0:
                 print("Iteration: %08d/%08d" % (iterations + 1, max_iter))
+                nmi, recall = trainer.evaluate(dl_ev, opts.multigpus)
                 write_loss(iterations, trainer, train_writer)
+                train_writer.add_scalar('nmi', nmi, iterations + 1)
+                for j, i in enumerate(opts.recall_list):
+                    train_writer.add_scalar('recall@{}'.format(i), recall[j], iterations + 1)
 
             if iterations == 0 or (iterations + 1) % config['snapshot_save_iter'] == 0 or (iterations + 1) >= max_iter:
                 trainer.save(checkpoint_directory, iterations, opts.multigpus)

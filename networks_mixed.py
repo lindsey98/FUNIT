@@ -138,13 +138,10 @@ class GPPatchMcResDis(nn.Module):
                              activation_first=True)]
         self.cnn_c = nn.Sequential(*cnn_c) # (B,sz_embed,H,W) -> (B,C,H,W)
 
-        self.scale = 3.
-
     def forward(self, x, y):
         assert(x.size(0) == y.size(0))
         feat = self.cnn_f(x) # (B,sz_embed,H,W)
         out = self.cnn_c(feat) # (B,C,H,W) for discriminating fake/real
-        print(y.long())
         out = out[torch.arange(out.size()[0]), y.long(), :, :] # (B,H,W) take corresponding channel
 
         feat = F.adaptive_avg_pool2d(feat, 1) # pooled over H, W
@@ -158,17 +155,17 @@ class GPPatchMcResDis(nn.Module):
         feat = feat.squeeze()
         return feat
 
-    def calc_metric_learning_loss(self, inputxa, inputxb, inputxt, la, lb, proxies):
+    def calc_metric_learning_loss(self, inputxa, inputxb, inputxt, la, lb, proxies, scale):
 
         _, xb_gan_feat = self.forward(inputxb, lb)
         _, xa_gan_feat = self.forward(inputxa, la)
         _, xt_gan_feat = self.forward(inputxt.detach(), la)
 
         P = proxies
-        P = self.scale * F.normalize(P, p=2, dim=-1)
+        P = scale * F.normalize(P, p=2, dim=-1)
 
         X = torch.cat((xa_gan_feat, xb_gan_feat, xt_gan_feat), dim=0)
-        X = self.scale * F.normalize(X, p=2, dim=-1)
+        X = scale * F.normalize(X, p=2, dim=-1)
 
         D = pairwise_distance(
             torch.cat(

@@ -26,6 +26,7 @@ class FUNITModel(nn.Module):
         self.gen_test = copy.deepcopy(self.gen)
         self.dis_test = copy.deepcopy(self.dis)
         self.proxies = torch.nn.Parameter(torch.randn(hp['dis']['num_classes'], hp['dis']['sz_embed']) / 8)
+        self.scale = 3.
 
     def forward(self, co_data, cl_data, hp, mode):
 
@@ -90,7 +91,8 @@ class FUNITModel(nn.Module):
 
             ######## Metric Learning Loss ########
              # FIXME: detach xt or not
-            l_metric = self.dis.calc_metric_learning_loss(xa, xb, xt.detach(), la, lb, self.proxies)
+            l_metric = self.dis.calc_metric_learning_loss(xa, xb, xt.detach(), la, lb,
+                                                          self.proxies, self.scale)
             l_metric = hp['gan_w'] * l_metric
             l_metric.backward()
 
@@ -166,14 +168,12 @@ class FUNITModel(nn.Module):
             # calculate NMI with kmeans clustering
             nmi = calc_normalized_mutual_information(
                 T,
-                cluster_by_kmeans(
-                    X, nb_classes
-                )
+                cluster_by_kmeans(X, nb_classes)
             )
         else:
             nmi = 1
 
-        logging.info("NMI: {:.3f}".format(nmi * 100))
+        print("NMI: {:.3f}".format(nmi * 100))
 
         # get predictions by assigning nearest 8 neighbors with euclidian
         max_dist = max(recall_list)
@@ -185,10 +185,10 @@ class FUNITModel(nn.Module):
         for k in recall_list:
             r_at_k = calc_recall_at_k(T, Y, k)
             recall.append(r_at_k)
-            logging.info("R@{} : {:.3f}".format(k, 100 * r_at_k))
+            print("R@{} : {:.3f}".format(k, 100 * r_at_k))
 
         chmean = (2 * nmi * recall[0]) / (nmi + recall[0])
-        logging.info("hmean: %s", str(chmean))
+        print("hmean: %s", str(chmean))
 
         eval_time = time.time() - eval_time
         logging.info('Eval time: %.2f' % eval_time)
