@@ -12,6 +12,7 @@ import torch.nn.functional as F
 from blocks import LinearBlock, Conv2dBlock, ResBlocks, ActFirstResBlock
 import sklearn.preprocessing
 import torchvision
+from modified_resnet import resnet50
 
 def pairwise_distance(a, squared=False):
     '''
@@ -107,30 +108,32 @@ class GPPatchMcResDis(nn.Module):
     '''
     def __init__(self, hp):
         super(GPPatchMcResDis, self).__init__()
-        assert hp['n_res_blks'] % 2 == 0, 'n_res_blk must be multiples of 2'
-        self.n_layers = hp['n_res_blks'] // 2
-        nf = hp['nf']
-        cnn_f = [Conv2dBlock(3, nf, 7, 1, 3,
-                             pad_type='reflect',
-                             norm='none',
-                             activation='none')] # image (B,3,H,W) --> (B,nf,H,W)
+        # assert hp['n_res_blks'] % 2 == 0, 'n_res_blk must be multiples of 2'
+        # self.n_layers = hp['n_res_blks'] // 2
+        # nf = hp['nf']
+        # cnn_f = [Conv2dBlock(3, nf, 7, 1, 3,
+        #                      pad_type='reflect',
+        #                      norm='none',
+        #                      activation='none')] # image (B,3,H,W) --> (B,nf,H,W)
+        #
+        # for i in range(self.n_layers - 1):
+        #     nf_out = np.min([nf * 2, 1024])
+        #     cnn_f += [ActFirstResBlock(nf, nf, None, 'lrelu', 'none')]
+        #     cnn_f += [ActFirstResBlock(nf, nf_out, None, 'lrelu', 'none')]
+        #     cnn_f += [nn.ReflectionPad2d(1)]
+        #     cnn_f += [nn.AvgPool2d(kernel_size=3, stride=2)] # (B,nf,H,W) --> (B,nf*2,H/2,W/2) everytime channel depth grows twice upper bound is 1024
+        #     nf = np.min([nf * 2, 1024])
+        #
+        # nf_out = np.min([nf, 1024])
+        # cnn_f += [ActFirstResBlock(nf, nf, None, 'lrelu', 'none')]
+        # cnn_f += [ActFirstResBlock(nf, nf_out, None, 'lrelu', 'none')]
 
-        for i in range(self.n_layers - 1):
-            nf_out = np.min([nf * 2, 1024])
-            cnn_f += [ActFirstResBlock(nf, nf, None, 'lrelu', 'none')]
-            cnn_f += [ActFirstResBlock(nf, nf_out, None, 'lrelu', 'none')]
-            cnn_f += [nn.ReflectionPad2d(1)]
-            cnn_f += [nn.AvgPool2d(kernel_size=3, stride=2)] # (B,nf,H,W) --> (B,nf*2,H/2,W/2) everytime channel depth grows twice upper bound is 1024
-            nf = np.min([nf * 2, 1024])
-
-        nf_out = np.min([nf, 1024])
-        cnn_f += [ActFirstResBlock(nf, nf, None, 'lrelu', 'none')]
-        cnn_f += [ActFirstResBlock(nf, nf_out, None, 'lrelu', 'none')]
-        cnn_f += [Conv2dBlock(nf_out, hp['sz_embed'], 1, 1,
+        self.base = resnet50(pretrained=True)
+        self.cnn_f = Conv2dBlock(2048, hp['sz_embed'], 1, 1,
                              norm='none',
                              activation='lrelu', # leaky relu
-                             activation_first=True)]
-        self.cnn_f = nn.Sequential(*cnn_f) # (B,sz_embed,H,W)
+                             activation_first=True) # (B,sz_embed,H,W)
+
 
         cnn_c = [Conv2dBlock(hp['sz_embed'], hp['num_classes'], 1, 1,
                              norm='none',
@@ -140,17 +143,38 @@ class GPPatchMcResDis(nn.Module):
 
     def forward(self, x, y):
         assert(x.size(0) == y.size(0))
+        x = self.base.conv1(x)
+        x = self.base.bn1(x)
+        x = self.base.relu(x)
+        x = self.base.maxpool(x)
+
+        x = self.base.layer1(x)
+        x = self.base.layer2(x)
+        x = self.base.layer3(x)
+        x = self.base.layer4(x)
+
         feat = self.cnn_f(x) # (B,sz_embed,H,W)
         out = self.cnn_c(feat) # (B,C,H,W) for discriminating fake/real
         out = out[torch.arange(out.size()[0]), y.long(), :, :] # (B,H,W) take corresponding channel
 
         feat = F.adaptive_avg_pool2d(feat, 1) # pooled over H, W
         feat = feat.squeeze()
+        feat = self.lnorm(feat)
         return out, feat
 
     def forward_partial(self, x, y):
         assert(x.size(0) == y.size(0))
-        feat = self.cnn_f(x) # (B,sz_embed,H,W)
+        x = self.base.conv1(x)
+        x = self.base.bn1(x)
+        x = self.base.relu(x)
+        x = self.base.maxpool(x)
+
+        x = self.base.layer1(x)
+        x = self.base.layer2(x)
+        x = self.base.layer3(x)
+        x = self.base.layer4(x)
+
+        feat = self.cnn_f(x)  # (B,sz_embed,H,W)
         feat = F.adaptive_avg_pool2d(feat, 1) # pooled over H, W
         feat = feat.squeeze()
         return feat

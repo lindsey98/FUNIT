@@ -140,6 +140,8 @@ if __name__ == '__main__':
     iterations = trainer.resume(checkpoint_directory,
                                 hp=config,
                                 multigpus=opts.multigpus) if opts.resume else 0
+    nmi, recall = trainer.evaluate(dl_ev, opts.multigpus)
+    print(recall)
 
     while True:
         for it, (x, y, indices) in enumerate(dl_tr):

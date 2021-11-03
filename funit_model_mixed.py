@@ -93,7 +93,7 @@ class FUNITModel(nn.Module):
              # FIXME: detach xt or not
             l_metric = self.dis.calc_metric_learning_loss(xa, xb, xt.detach(), la, lb,
                                                           self.proxies, self.scale)
-            l_metric = hp['gan_w'] * l_metric
+            l_metric = 100 * hp['gan_w'] * l_metric
             l_metric.backward()
 
             l_total = l_fake + l_real + l_reg + l_metric
