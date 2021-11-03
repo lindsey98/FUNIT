@@ -38,10 +38,10 @@ class Trainer(nn.Module):
 
         self.dis_opt = torch.optim.RMSprop(
             [p for p in dis_params if p.requires_grad],
-            lr=lr_gen, weight_decay=cfg['weight_decay'])
+            lr=lr_dis, weight_decay=cfg['weight_decay'])
         self.gen_opt = torch.optim.RMSprop(
             [p for p in gen_params if p.requires_grad],
-            lr=lr_dis, weight_decay=cfg['weight_decay'])
+            lr=lr_gen, weight_decay=cfg['weight_decay'])
         self.proxy_opt = torch.optim.RMSprop(
             [proxies_params],
             lr=lr_proxy, weight_decay=cfg['weight_decay'])
