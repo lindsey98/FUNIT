@@ -8,7 +8,7 @@ import copy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from networks import FewShotGen, GPPatchMcResDis
+from deprecated.FUNIT.networks import FewShotGen, GPPatchMcResDis
 
 
 def recon_criterion(predict, target):

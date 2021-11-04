@@ -10,8 +10,8 @@ import shutil
 
 from tensorboardX import SummaryWriter
 
-from utils import get_config, get_train_loaders, make_result_folders
-from utils import write_loss, write_html, write_1images, Timer
+from deprecated.FUNIT.utils import get_config, get_train_loaders, make_result_folders
+from deprecated.FUNIT.utils import write_loss, Timer
 from trainer import Trainer
 
 import torch.backends.cudnn as cudnn

@@ -1,9 +1,7 @@
-import matplotlib.pyplot as plt
 import torch
 import os
 import argparse
-import shutil
-from utils import get_config, get_train_loaders, make_result_folders, dataset_from_list
+from deprecated.FUNIT.utils import get_config, dataset_from_list
 from trainer import Trainer
 
 import torch.backends.cudnn as cudnn

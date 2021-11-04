@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from networks_mixed import FewShotGen, GPPatchMcResDis
 import time
-from utils import calc_recall_at_k, calc_normalized_mutual_information, cluster_by_kmeans, assign_by_euclidian_at_k
+from deprecated.FUNIT.utils import calc_recall_at_k, calc_normalized_mutual_information, cluster_by_kmeans, assign_by_euclidian_at_k
 import logging
 from tqdm import tqdm
 

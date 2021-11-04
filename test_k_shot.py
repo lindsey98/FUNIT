@@ -11,7 +11,7 @@ import torch
 import torch.backends.cudnn as cudnn
 from torchvision import transforms
 
-from utils import get_config
+from deprecated.FUNIT.utils import get_config
 from trainer import Trainer
 
 import argparse
